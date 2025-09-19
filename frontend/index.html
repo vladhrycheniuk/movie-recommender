@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Movie Recommender</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input, button { margin: 5px; padding: 5px; }
+        .movie { border-bottom: 1px solid #ccc; padding: 5px 0; }
+        .section { margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Movie Recommender</h1>
+
+    <div class="section">
+        <h2>Search Movies</h2>
+        <input type="text" id="searchQuery" placeholder="Search by title">
+        <input type="number" id="minRating" placeholder="Min rating" min="0" max="5" step="0.1">
+        <button onclick="searchMovies()">Search</button>
+        <div id="searchResults"></div>
+    </div>
+
+    <div class="section">
+        <h2>Recommend Movies</h2>
+        <input type="number" id="movieId" placeholder="Movie ID">
+        <input type="number" id="topN" placeholder="Top N" min="1" max="20" value="10">
+        <button onclick="recommendMovies()">Recommend</button>
+        <div id="recommendResults"></div>
+    </div>
+
+    <script>
+        const backendUrl = "http://127.0.0.1:8000";
+
+        async function searchMovies() {
+            const q = document.getElementById("searchQuery").value;
+            const minRating = document.getElementById("minRating").value || 0;
+            const url = `${backendUrl}/search?q=${encodeURIComponent(q)}&min_rating=${minRating}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const container = document.getElementById("searchResults");
+                if(data.length === 0) {
+                    container.innerHTML = "<div>No movies found</div>";
+                    return;
+                }
+                container.innerHTML = data.map(m => 
+                    `<div class="movie"><strong>${m.title}</strong> (${m.year || "N/A"}) - Rating: ${m.rating.toFixed(1)}</div>`
+                ).join('');
+            } catch (err) {
+                console.error(err);
+                document.getElementById("searchResults").innerHTML = "<div style='color:red'>Error fetching data</div>";
+            }
+        }
+
+        async function recommendMovies() {
+            const movieId = document.getElementById("movieId").value;
+            const topN = document.getElementById("topN").value || 10;
+            const url = movieId 
+                ? `${backendUrl}/recommend?movie_id=${movieId}&top_n=${topN}` 
+                : `${backendUrl}/recommend?top_n=${topN}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const container = document.getElementById("recommendResults");
+                if(data.error) {
+                    container.innerHTML = `<div style="color:red">${data.error}</div>`;
+                } else if(data.length === 0) {
+                    container.innerHTML = "<div>No recommendations found</div>";
+                } else {
+                    container.innerHTML = data.map(m => 
+                        `<div class="movie"><strong>${m.title}</strong> (${m.year || "N/A"}) - Rating: ${m.rating.toFixed(1)}</div>`
+                    ).join('');
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById("recommendResults").innerHTML = "<div style='color:red'>Error fetching data</div>";
+            }
+        }
+    </script>
+</body>
+</html>
