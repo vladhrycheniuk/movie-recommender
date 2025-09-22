@@ -1,215 +1,86 @@
-<!-- frontend/index.html -->
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Movie Recommender</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<style>
-    :root{
-        --brown: #75564d;
-        --gold: #dbaf8a;
-        --lightgray: #a2aeb3;
-        --bluegray: #6f8ca4;
-        --navy: #203a58;
-        --bg: #f7f6f5;
-    }
-    body{font-family: Inter, Arial, sans-serif; margin:0; background:var(--bg); color:#222;}
-    header{
-        background: linear-gradient(90deg,var(--navy),var(--bluegray));
-        color:var(--gold);
-        padding:18px 24px;
-        display:flex;
-        align-items:center;
-        gap:18px;
-    }
-    header h1{margin:0; font-size:20px;}
-    .container{max-width:1100px;margin:20px auto;padding:16px;}
-    .card{background:white;border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,0.06); margin-bottom:14px;}
-    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    input[type="text"], select, input[type="number"]{padding:8px;border:1px solid #ddd;border-radius:6px;min-width:140px}
-    button{
-        background:var(--brown); color:var(--gold); border:none; padding:10px 14px;border-radius:8px; cursor:pointer;
-        box-shadow:0 2px 6px rgba(0,0,0,0.08);
-    }
-    button.secondary{background:var(--bluegray); color:white}
-    .movie{padding:10px;border-bottom:1px solid #efefef; display:flex; justify-content:space-between; align-items:center}
-    .movie .meta{color:var(--lightgray); font-size:13px}
-    .movie:hover{background:linear-gradient(90deg, rgba(245,241,238,0.6), white)}
-    .movies-list{max-height:420px; overflow:auto}
-    .section-title{font-weight:600;margin-bottom:8px}
-    .small{font-size:13px;color:var(--lightgray)}
-    .tags{display:flex;gap:6px;flex-wrap:wrap}
-    .tag{background:var(--gold); color:var(--navy); padding:4px 8px;border-radius:6px;font-weight:600;font-size:12px}
-    .loader{display:inline-block;padding:6px 8px;border-radius:6px;background:#fff; border:1px solid #eee; color:#666}
-    @media (max-width:700px){
-        .controls{flex-direction:column;align-items:stretch}
-    }
-</style>
+  <meta charset="UTF-8">
+  <title>Movie Recommender</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-    <h1>Movie Recommender</h1>
-    <div class="small">local demo • FastAPI backend</div>
-</header>
+  <header>
+    <h1>🎬 Movie Recommender</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="recommendations.html">Recommendations</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
 
-<div class="container">
-    <div class="card">
-        <div class="section-title">Пошук фільмів</div>
-        <div class="controls">
-            <input id="q" type="text" placeholder="Назва фільму (частково)" />
-            <select id="genre"><option value="">— Жанр (всі) —</option></select>
-            <input id="year_from" type="number" placeholder="Рік від" />
-            <input id="year_to" type="number" placeholder="Рік до" />
-            <input id="min_rating" type="number" step="0.1" min="0" max="5" placeholder="Мін. рейтинг" />
-            <select id="sort_by">
-                <option value="rating">Сортувати: рейтинг</option>
-                <option value="year">Сортувати: рік</option>
-            </select>
-            <button onclick="doSearch()">Search</button>
-            <button class="secondary" onclick="resetFilters()">Reset</button>
-        </div>
-        <div id="searchInfo" class="small" style="margin-top:8px"></div>
-        <div id="searchResults" class="movies-list" style="margin-top:8px"></div>
-    </div>
+  <main>
+    <!-- Популярні фільми -->
+    <section>
+      <h2>🔥 Popular Movies</h2>
+      <div id="popular" class="results-grid"></div>
+    </section>
 
-    <div class="card">
-        <div class="section-title">Рекомендації</div>
-        <div class="controls">
-            <input id="movie_id" type="number" placeholder="Movie ID (натисни на фільм для автопідстановки)" />
-            <input id="top_n" type="number" placeholder="Top N" value="8" min="1" max="50" />
-            <button onclick="doRecommend()">Recommend</button>
-        </div>
-        <div id="recommendResults" class="movies-list" style="margin-top:8px"></div>
-    </div>
-</div>
+    <!-- Пошук -->
+    <section class="search-section">
+      <h2>🔎 Search Movies</h2>
+      <input type="text" id="search-input" placeholder="Enter movie title...">
+      <button onclick="searchMovies()">Search</button>
+    </section>
 
-<script>
-const backendUrl = "http://127.0.0.1:8000";
+    <section id="results" class="results-grid"></section>
+  </main>
 
-function el(html){ const div=document.createElement('div'); div.innerHTML=html; return div.firstElementChild; }
+  <script>
+    const backendUrl = "http://127.0.0.1:8000";
 
-async function fetchJSON(url){
-    try{
-        const r = await fetch(url);
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        return await r.json();
-    }catch(e){
-        console.error('Fetch error', url, e);
-        throw e;
+    // Placeholder постери
+    function getPosterUrl(title) {
+        return `https://via.placeholder.com/200x300.png?text=${encodeURIComponent(title)}`;
     }
-}
 
-async function loadGenres(){
-    try{
-        const genres = await fetchJSON(`${backendUrl}/genres`);
-        const sel = document.getElementById('genre');
-        genres.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g;
-            opt.textContent = g;
-            sel.appendChild(opt);
-        });
-    }catch(e){
-        console.warn('Cannot load genres', e);
+    async function loadPopular() {
+      try {
+        const response = await fetch(`${backendUrl}/popular`);
+        const data = await response.json();
+        document.getElementById("popular").innerHTML = data
+          .map(movie => `
+            <div class="card">
+              <img src="${getPosterUrl(movie.title)}" alt="${movie.title}" class="poster">
+              <h3>${movie.title}</h3>
+              <p>ID: ${movie.movie_id}</p>
+            </div>
+          `).join("");
+      } catch (err) {
+        document.getElementById("popular").innerHTML = "<p style='color:red;'>Error loading popular movies</p>";
+      }
     }
-}
 
-function movieItemHtml(m){
-    const year = m.year || 'N/A';
-    const rating = (m.rating || 0).toFixed(1);
-    const genres = m.genres ? m.genres.split('|').slice(0,4) : [];
-    const tagsHtml = genres.map(g => `<span class="tag">${g}</span>`).join('');
-    return `
-    <div class="movie" data-id="${m.movie_id}">
-        <div>
-            <div style="font-weight:700">${m.title} <span class="small">(${year})</span></div>
-            <div class="meta small">${m.rating_count || 0} votes • Rating: ${rating}</div>
-            <div style="margin-top:6px" class="tags">${tagsHtml}</div>
-        </div>
-        <div style="text-align:right">
-            <div style="font-weight:700">${rating}</div>
-            <button onclick="onClickRecommendFrom(this)" style="margin-top:8px">→ similar</button>
-        </div>
-    </div>`;
-}
-
-function attachClickHandlers(container){
-    container.querySelectorAll('.movie').forEach(node=>{
-        node.addEventListener('click', (ev)=>{
-            // якщо клікнув не на кнопку, встановимо movie_id для recommend
-            if(ev.target.tagName.toLowerCase() !== 'button'){
-                const id = node.getAttribute('data-id');
-                document.getElementById('movie_id').value = id;
-            }
-        });
-    });
-}
-
-async function doSearch(){
-    const q = encodeURIComponent(document.getElementById('q').value || '');
-    const genre = encodeURIComponent(document.getElementById('genre').value || '');
-    const year_from = document.getElementById('year_from').value || '';
-    const year_to = document.getElementById('year_to').value || '';
-    const min_rating = document.getElementById('min_rating').value || '';
-    const sort_by = document.getElementById('sort_by').value || 'rating';
-    const limit = 50;
-    const url = `${backendUrl}/search?q=${q}&genre=${genre}&year_from=${year_from}&year_to=${year_to}&min_rating=${min_rating}&sort_by=${sort_by}&limit=${limit}`;
-    const info = document.getElementById('searchInfo');
-    const out = document.getElementById('searchResults');
-    info.textContent = 'Loading...'; out.innerHTML = '';
-    try{
-        const data = await fetchJSON(url);
-        info.textContent = `Found ${data.length} result(s)`;
-        if(data.length === 0){ out.innerHTML = '<div class="small">No movies</div>'; return; }
-        out.innerHTML = data.map(m => movieItemHtml(m)).join('');
-        attachClickHandlers(out);
-    }catch(e){
-        info.textContent = 'Error fetching results';
-        out.innerHTML = '<div style="color:red">Error fetching results</div>';
+    async function searchMovies() {
+      const query = document.getElementById("search-input").value.trim();
+      if (!query) {
+        document.getElementById("results").innerHTML = "<p>Please enter a search term.</p>";
+        return;
+      }
+      try {
+        const response = await fetch(`${backendUrl}/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        document.getElementById("results").innerHTML = data.length > 0
+          ? data.map(movie => `
+            <div class="card">
+              <img src="${getPosterUrl(movie.title)}" alt="${movie.title}" class="poster">
+              <h3>${movie.title}</h3>
+              <p>ID: ${movie.movie_id}</p>
+            </div>
+          `).join("")
+          : "<p>No results found.</p>";
+      } catch (err) {
+        document.getElementById("results").innerHTML = "<p style='color:red;'>Error fetching results</p>";
+      }
     }
-}
 
-async function doRecommend(){
-    const movieId = document.getElementById('movie_id').value;
-    const topN = document.getElementById('top_n').value || 8;
-    const url = movieId ? `${backendUrl}/recommend?movie_id=${movieId}&top_n=${topN}` : `${backendUrl}/recommend?top_n=${topN}`;
-    const out = document.getElementById('recommendResults');
-    out.innerHTML = '<div class="loader">Loading...</div>';
-    try{
-        const data = await fetchJSON(url);
-        if(data.error){ out.innerHTML = `<div style="color:red">${data.error}</div>`; return; }
-        out.innerHTML = data.map(m => movieItemHtml(m)).join('');
-        attachClickHandlers(out);
-    }catch(e){
-        out.innerHTML = '<div style="color:red">Error fetching recommendations</div>';
-    }
-}
-
-// helper for button inside movie card
-function onClickRecommendFrom(button){
-    button.closest('.movie') && button.closest('.movie').click();
-    const id = button.closest('.movie').getAttribute('data-id');
-    document.getElementById('movie_id').value = id;
-    doRecommend();
-}
-
-function resetFilters(){
-    document.getElementById('q').value = '';
-    document.getElementById('genre').value = '';
-    document.getElementById('year_from').value = '';
-    document.getElementById('year_to').value = '';
-    document.getElementById('min_rating').value = '';
-    document.getElementById('sort_by').value = 'rating';
-    document.getElementById('searchResults').innerHTML = '';
-    document.getElementById('searchInfo').textContent = '';
-}
-
-(async function init(){
-    await loadGenres();
-    // optional initial load: top rated
-    doSearch();
-})();
-</script>
+    loadPopular();
+  </script>
 </body>
 </html>
